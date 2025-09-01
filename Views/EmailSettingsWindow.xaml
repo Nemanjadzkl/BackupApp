@@ -1,0 +1,39 @@
+<Window x:Class="BackupApp.Views.EmailSettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        Title="Email podešavanja" Height="200" Width="400"
+        WindowStartupLocation="CenterOwner">
+    
+    <materialDesign:Card Margin="16">
+        <DockPanel Margin="32">
+            <TextBlock Text="Email Podešavanja"
+                     Style="{StaticResource MaterialDesignHeadline5TextBlock}"
+                     DockPanel.Dock="Top"
+                     Margin="0,0,0,24"/>
+
+            <StackPanel>
+                <TextBox x:Name="txtToEmail"
+                         materialDesign:HintAssist.Hint="Email za primanje izveštaja"
+                         Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                         Margin="0,0,0,24"/>
+
+                <StackPanel Orientation="Horizontal" 
+                          HorizontalAlignment="Right">
+                    <Button x:Name="btnTest"
+                            Style="{StaticResource MaterialDesignOutlinedButton}"
+                            Content="TEST"
+                            Margin="0,0,8,0"
+                            Click="BtnTest_Click"/>
+                    <Button Style="{StaticResource MaterialDesignRaisedButton}"
+                            Content="SAČUVAJ"
+                            Margin="0,0,8,0"
+                            Click="BtnSave_Click"/>
+                    <Button Style="{StaticResource MaterialDesignOutlinedButton}"
+                            Content="OTKAŽI"
+                            Click="BtnCancel_Click"/>
+                </StackPanel>
+            </StackPanel>
+        </DockPanel>
+    </materialDesign:Card>
+</Window>
