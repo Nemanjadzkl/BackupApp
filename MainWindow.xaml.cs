@@ -40,63 +40,7 @@ namespace BackupApp
         {
             _backupService.OnLog += LogMessage;
             _backupService.OnProgress += UpdateProgress;
-
-            _backupService.OnMountButtonClick += async () => 
-            {
-                await MountAsync();
-            };
-            
-            _backupService.OnBackupButtonClick += async () => 
-            {
-                await StartBackupAsync();
-            };
-            
-            _backupService.OnUnmountButtonClick += async () => 
-            {
-                await UnmountAsync();
-            };
-
             _backupService.Initialize();
-        }
-
-        private async Task MountAsync()
-        {
-            try
-            {
-                await Task.Run(() => _backupService.MountBackupDrive());
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Greška pri montiranju diska: {ex.Message}", "Greška", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        private async Task StartBackupAsync()
-        {
-            try
-            {
-                var paths = _backupService.SavedPaths;
-                if (paths.Any())
-                {
-                    await _backupService.PerformBackupAsync(paths, BackupType.Full);
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Greška pri backup-u: {ex.Message}", "Greška", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        private async Task UnmountAsync()
-        {
-            try
-            {
-                await Task.Run(() => _backupService.UnmountBackupDrive());
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Greška pri demontiranju diska: {ex.Message}", "Greška", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
         }
 
         private void BtnMount_Click(object sender, RoutedEventArgs e)
