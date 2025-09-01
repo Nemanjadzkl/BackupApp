@@ -1,0 +1,119 @@
+<Window x:Class="BackupApp.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        Title="Backup Aplikacija" Height="600" Width="800"
+        TextElement.Foreground="{DynamicResource MaterialDesignBody}"
+        Background="{DynamicResource MaterialDesignPaper}"
+        FontFamily="{materialDesign:MaterialDesignFont}">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Basic Controls -->
+        <materialDesign:Card Grid.Row="0" Margin="0,0,0,16" Padding="16">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Left">
+                    <TextBlock Text="Backup Manager" 
+                              Style="{StaticResource MaterialDesignHeadline5TextBlock}"
+                              VerticalAlignment="Center"/>
+                    <TextBlock x:Name="txtNextBackup" 
+                              Style="{StaticResource MaterialDesignBody2TextBlock}"
+                              Margin="0,4,0,0"/>
+                </StackPanel>
+                          
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button x:Name="btnStartBackup" 
+                            Style="{StaticResource MaterialDesignRaisedButton}"
+                            Content="Pokreni backup"
+                            Click="BtnStartBackup_Click" 
+                            Margin="0,0,8,0"/>
+                    <Button x:Name="btnSchedule" 
+                            Style="{StaticResource MaterialDesignOutlinedButton}"
+                            Content="Zakaži backup"
+                            Click="BtnSchedule_Click" 
+                            Margin="0,0,8,0"/>
+                    <Button x:Name="btnMountDisk" 
+                            Style="{StaticResource MaterialDesignOutlinedButton}"
+                            Content="Mount"
+                            Click="BtnMountDisk_Click" 
+                            Margin="0,0,8,0"/>
+                    <Button x:Name="btnUnmountDisk" 
+                            Style="{StaticResource MaterialDesignOutlinedButton}"
+                            Content="Unmount"
+                            Click="BtnUnmountDisk_Click" 
+                            Margin="0,0,8,0"/>
+                    <Button x:Name="btnEmailSettings"
+                            Style="{StaticResource MaterialDesignOutlinedButton}"
+                            Content="Email Settings"
+                            Click="BtnEmailSettings_Click"/>
+                </StackPanel>
+            </DockPanel>
+        </materialDesign:Card>
+
+        <!-- Main Content -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="250"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <materialDesign:Card Grid.Column="0">
+                <DockPanel Margin="16">
+                    <Button x:Name="btnAddFolder" 
+                            DockPanel.Dock="Top"
+                            Style="{StaticResource MaterialDesignRaisedButton}"
+                            Click="BtnAddFolder_Click" 
+                            Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="FolderPlus" Margin="0,0,8,0"/>
+                            <TextBlock Text="Add Folder"/>
+                        </StackPanel>
+                    </Button>
+                    <ListBox x:Name="lstFolders" 
+                            Style="{StaticResource MaterialDesignListBox}">
+                        <ListBox.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Remove Folder" Click="RemoveFolder_Click">
+                                    <MenuItem.Icon>
+                                        <materialDesign:PackIcon Kind="FolderRemove"/>
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                            </ContextMenu>
+                        </ListBox.ContextMenu>
+                    </ListBox>
+                </DockPanel>
+            </materialDesign:Card>
+
+            <materialDesign:Card Grid.Column="1" Margin="16,0,0,0">
+                <StackPanel Margin="16">
+                    <TextBlock x:Name="txtCurrentOperation"
+                              Style="{StaticResource MaterialDesignSubtitle1TextBlock}"/>
+                    <ProgressBar x:Name="progressBar" 
+                               Style="{StaticResource MaterialDesignLinearProgressBar}"
+                               Height="4" 
+                               Margin="0,8"/>
+                    <TextBlock x:Name="txtCurrentFile"
+                              Style="{StaticResource MaterialDesignBody2TextBlock}"/>
+                    <ListBox x:Name="lstCurrentFiles" 
+                            Style="{StaticResource MaterialDesignListBox}"
+                            Height="200" 
+                            Margin="0,8"/>
+                </StackPanel>
+            </materialDesign:Card>
+        </Grid>
+
+        <!-- Log -->
+        <materialDesign:Card Grid.Row="2" Margin="0,16,0,0">
+            <TextBox x:Name="txtLog" 
+                    Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                    Height="100" 
+                    Margin="16"
+                    IsReadOnly="True"
+                    VerticalScrollBarVisibility="Auto"/>
+        </materialDesign:Card>
+    </Grid>
+</Window>
