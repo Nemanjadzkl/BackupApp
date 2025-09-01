@@ -434,6 +434,18 @@ namespace BackupApp
                     throw new Exception("Nije moguće montirati backup disk");
                 }
 
+                // Dodatna provera da li je D: disk zaista dostupan za pisanje
+                try
+                {
+                    string testFile = Path.Combine("D:\\", $"write_test_{Guid.NewGuid()}.tmp");
+                    await File.WriteAllTextAsync(testFile, "test");
+                    File.Delete(testFile);
+                }
+                catch (Exception writeEx)
+                {
+                    throw new Exception($"Backup disk D: je montiran, ali nije moguće pisati po njemu. Greška: {writeEx.Message}");
+                }
+
                 // ...existing backup logic...
                 var allFiles = new List<FileInfo>();
                 foreach (var path in sourcePaths)
@@ -672,7 +684,9 @@ namespace BackupApp
             var backupRoot = "D:\\Backup";
             var datePart = DateTime.Now.ToString("yyyy-MM-dd");
             var typePart = backupType.ToString();
-            var relativePath = sourceFile.FullName.Substring(sourceFile.Directory.Root.Name.Length);
+
+    // Korišćenje Path.GetRelativePath za robusnije dobijanje relativne putanje
+    var relativePath = Path.GetRelativePath(sourceFile.Directory.Root.FullName, sourceFile.FullName);
 
             return Path.Combine(backupRoot, typePart, datePart, relativePath);
         }
