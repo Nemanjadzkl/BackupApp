@@ -78,7 +78,8 @@ namespace BackupApp
                 var paths = _backupService.SavedPaths;
                 if (paths.Any())
                 {
-                    await _backupService.PerformBackupAsync(paths, BackupType.Full);
+                    var backupType = radIncrementalBackup.IsChecked == true ? BackupType.Incremental : BackupType.Full;
+                    await _backupService.PerformBackupAsync(paths, backupType);
                 }
             }
             catch (Exception ex)
@@ -108,7 +109,8 @@ namespace BackupApp
         {
             if (_backupService.SavedPaths.Any())
             {
-                Task.Run(() => _backupService.PerformBackupAsync(_backupService.SavedPaths, BackupType.Full));
+                var backupType = radIncrementalBackup.IsChecked == true ? BackupType.Incremental : BackupType.Full;
+                Task.Run(() => _backupService.PerformBackupAsync(_backupService.SavedPaths, backupType));
             }
         }
 

@@ -26,6 +26,10 @@
                 </StackPanel>
                           
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <StackPanel Orientation="Vertical" Margin="0,0,16,0" VerticalAlignment="Center">
+                        <RadioButton x:Name="radFullBackup" Content="Pun backup" IsChecked="True" GroupName="BackupType" Style="{StaticResource MaterialDesignRadioButton}" />
+                        <RadioButton x:Name="radIncrementalBackup" Content="Samo izmenjeni" GroupName="BackupType" Style="{StaticResource MaterialDesignRadioButton}" />
+                    </StackPanel>
                     <Button x:Name="btnStartBackup" 
                             Style="{StaticResource MaterialDesignRaisedButton}"
                             Content="Pokreni backup"
