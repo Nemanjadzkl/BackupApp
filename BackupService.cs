@@ -324,8 +324,7 @@ namespace BackupApp
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    Verb = "runas"
+                    RedirectStandardError = true
                 };
 
                 process.Start();
@@ -353,8 +352,7 @@ namespace BackupApp
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    Verb = "runas"
+                    RedirectStandardError = true
                 };
 
                 process.Start();
