@@ -7,7 +7,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Linq;
 using BackupApp.Models;
-using BackupApp.Services;  // Dodajemo ovo
+using BackupApp.Services;
 using System.Threading;
 using System.Net.Mail;
 using System.Text.Json;
@@ -26,13 +26,12 @@ namespace BackupApp
     public class BackupService : Services.IBackupService
     {
         private readonly Services.ScheduleService _scheduleService;
-        private readonly NetworkTimeService _networkTimeService;
-        
+
         public delegate void LogHandler(string message, bool isError = false);
         public delegate void ProgressHandler(ProgressInfo progress);
         public event LogHandler? OnLog;
         public event ProgressHandler? OnProgress;
-        
+
         // Čuvamo informacije o poslednjem backup-u za inkrementalni backup
         private string lastBackupPath = string.Empty;
         private DateTime lastBackupTime = DateTime.MinValue;
@@ -57,11 +56,9 @@ namespace BackupApp
         private EmailService _emailService;
         private readonly List<string> _processedFiles = new();
         private readonly List<string> _errors = new();
-    
+
         public EmailSettings EmailSettings { get; set; } = new();
 
-        private readonly System.Timers.Timer _scheduleTimer;
-        private DateTime _lastRunTime = DateTime.MinValue;
         public List<string> SavedPaths { get; private set; } = new();
 
         public BackupService()
@@ -70,137 +67,19 @@ namespace BackupApp
             var appDataPath = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                 "BackupApp");
-            
+
             if (!Directory.Exists(appDataPath))
             {
                 Directory.CreateDirectory(appDataPath);
                 LogMessage($"Kreiran konfiguracioni direktorijum: {appDataPath}", false);
             }
 
-            _networkTimeService = new NetworkTimeService();
-            EmailSettings = new EmailSettings
-            {
-                SmtpServer = "smtp.aol.com",
-                SmtpPort = 587,
-                Username = "dzekn@aol.com",
-                Password = "ibewcjgpnjxketvi",
-                FromEmail = "dzekn@aol.com",
-                ToEmail = "dzekn@aol.com",
-                EnableSsl = true
-            };
-
+            // Prvo učitaj podešavanja, pa onda inicijalizuj servis
+            LoadEmailSettings();
             _emailService = new EmailService(EmailSettings);
             _emailService.OnLog += (message, isError) => OnLog?.Invoke(message, isError);
 
-            // Promena inicijalizacije timer-a
-            _scheduleTimer = new System.Timers.Timer(30000); // Provera na 30 sekundi
-            _scheduleTimer.Elapsed += CheckSchedule;
-            _scheduleTimer.AutoReset = true;
-            _scheduleTimer.Enabled = true;
-
-            LoadEmailSettings();
             _scheduleService = new Services.ScheduleService(this);
-        }
-
-        // Dodajemo delegat za simulaciju dugmadi
-        public delegate Task ButtonClickHandler();
-        public event ButtonClickHandler? OnMountButtonClick;
-        public event ButtonClickHandler? OnBackupButtonClick;
-        public event ButtonClickHandler? OnUnmountButtonClick;
-
-        private void CheckSchedule(object? sender, ElapsedEventArgs e)
-        {
-            try
-            {
-                if (CurrentSchedule == null || !CurrentSchedule.IsEnabled) 
-                    return;
-
-                LoadPaths(); // Reload paths before checking
-                LogMessage($"Provera rasporeda - trenutno imamo {SavedPaths.Count} foldera", false);
-                
-                if (SavedPaths.Count == 0)
-                {
-                    LogMessage("Nema sačuvanih foldera za backup", true);
-                    return;
-                }
-
-                var networkTime = _networkTimeService.GetNetworkTime();
-                var scheduledTime = DateTime.Today.Add(CurrentSchedule.Time);
-                
-                LogMessage($"Provera - vreme: {networkTime:HH:mm:ss}, zakazano: {scheduledTime:HH:mm}", false);
-                LogMessage($"Putanje: {string.Join(", ", SavedPaths)}", false);
-
-                if (networkTime.Hour == scheduledTime.Hour && 
-                    networkTime.Minute == scheduledTime.Minute && 
-                    _lastRunTime.Date != networkTime.Date)
-                {
-                    _lastRunTime = networkTime;
-                    LogMessage($"Pokretanje backup-a za {SavedPaths.Count} foldera!", false);
-                    Task.Run(ExecuteScheduledBackupAsync);
-                }
-            }
-            catch (Exception ex)
-            {
-                LogMessage($"Greška u CheckSchedule: {ex.Message}", true);
-            }
-        }
-
-        private async Task ExecuteScheduledBackupAsync()
-        {
-            try
-            {
-                if (CurrentSchedule == null)
-                {
-                    LogMessage("Backup nije konfigurisan", true);
-                    return;
-                }
-
-                LogMessage("Započinjem zakazani backup...", false);
-                var report = new BackupReport
-                {
-                    StartTime = DateTime.Now,
-                    BackupType = CurrentSchedule.BackupType
-                };
-                
-                // 1. Klikni Mount dugme
-                LogMessage("Korak 1/3: Montiram disk...", false);
-                if (OnMountButtonClick != null)
-                {
-                    await OnMountButtonClick.Invoke();
-                    await Task.Delay(2000);
-                }
-
-                // 2. Klikni Backup dugme
-                LogMessage("Korak 2/3: Pokrećem backup...", false);
-                if (OnBackupButtonClick != null)
-                {
-                    await OnBackupButtonClick.Invoke();
-                    await Task.Delay(1000);
-                }
-
-                // 3. Klikni Unmount dugme
-                LogMessage("Korak 3/3: Demontiram disk...", false);
-                if (OnUnmountButtonClick != null)
-                {
-                    await OnUnmountButtonClick.Invoke();
-                }
-
-                report.EndTime = DateTime.Now;
-                await SendBackupReportEmailAsync(report);  // Šaljemo kompletan HTML izveštaj
-                LogMessage("Zakazani backup je uspešno završen", false);
-            }
-            catch (Exception ex)
-            {
-                LogMessage($"Greška pri izvršavanju backup-a: {ex.Message}", true);
-                await SendBackupNotificationAsync(false, ex.Message);
-                
-                try 
-                {
-                    if (OnUnmountButtonClick != null)
-                        await OnUnmountButtonClick.Invoke();
-                }
-                catch { }
-            }
         }
 
         private async Task SendBackupNotificationAsync(bool success, string? error = null)
@@ -208,7 +87,7 @@ namespace BackupApp
             if (string.IsNullOrEmpty(EmailSettings.ToEmail)) return;
 
             var subject = success ? "Backup uspešno završen" : "Greška pri backup-u";
-            var body = success 
+            var body = success
                 ? $"Backup je uspešno završen u {DateTime.Now:dd.MM.yyyy HH:mm}."
                 : $"Došlo je do greške pri backup-u u {DateTime.Now:dd.MM.yyyy HH:mm}.\nGreška: {error}";
 
@@ -230,7 +109,7 @@ namespace BackupApp
 
         private BackupSettings? LoadSettings()
         {
-            try 
+            try
             {
                 string settingsPath = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -269,10 +148,15 @@ namespace BackupApp
                         OnLog?.Invoke("Email podešavanja su učitana", false);
                     }
                 }
+                else
+                {
+                    EmailSettings = new EmailSettings(); // Fallback to empty settings
+                }
             }
             catch (Exception ex)
             {
                 Log($"Greška pri učitavanju email podešavanja: {ex.Message}", true);
+                EmailSettings = new EmailSettings(); // Fallback on error
             }
         }
 
@@ -284,7 +168,7 @@ namespace BackupApp
                     return;
 
                 var backupFolders = Directory.GetDirectories("D:\\")
-                    .Where(d => Path.GetFileName(d).StartsWith("Full_Backup_") || 
+                    .Where(d => Path.GetFileName(d).StartsWith("Full_Backup_") ||
                                Path.GetFileName(d).StartsWith("Incr_Backup_"))
                     .Select(d => new DirectoryInfo(d))
                     .OrderByDescending(d => d.CreationTime)
@@ -345,7 +229,7 @@ namespace BackupApp
                 if (ExecuteDiskPartCommand(mountScript))
                 {
                     System.Threading.Thread.Sleep(2000);
-                    
+
                     if (Directory.Exists("D:\\"))
                     {
                         Log("Disk D uspešno mountovan");
@@ -494,7 +378,7 @@ namespace BackupApp
             string typePrefix = backupType == BackupType.Full ? "Full" : "Incr";
             string backupFolderName = $"{typePrefix}_Backup_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}";
             string backupPath = Path.Combine("D:\\", backupFolderName);
-            
+
             Directory.CreateDirectory(backupPath);
             Log($"Kreiran {(backupType == BackupType.Full ? "pun" : "inkrementalni")} backup folder: {backupPath}");
 
@@ -554,7 +438,7 @@ namespace BackupApp
                 var allFiles = new List<FileInfo>();
                 foreach (var path in sourcePaths)
                 {
-                    OnProgress?.Invoke(new ProgressInfo 
+                    OnProgress?.Invoke(new ProgressInfo
                     {
                         CurrentOperation = "Pripremam backup...",
                         CurrentFile = path,
@@ -578,7 +462,7 @@ namespace BackupApp
                 {
                     try
                     {
-                        OnProgress?.Invoke(new ProgressInfo 
+                        OnProgress?.Invoke(new ProgressInfo
                         {
                             Percentage = (int)((processedSize * 100.0) / report.TotalSize),
                             CurrentOperation = $"Backup u toku ({report.SuccessfulFiles + 1}/{report.TotalFiles})",
@@ -605,7 +489,7 @@ namespace BackupApp
                     $"Ukupna veličina: {FormatFileSize(report.TotalSize)}\n" +
                     $"Trajanje: {report.Duration.ToString(@"hh\:mm\:ss")}";
                 OnLog?.Invoke(successMessage, false);
-                OnProgress?.Invoke(new ProgressInfo 
+                OnProgress?.Invoke(new ProgressInfo
                 {
                     CurrentOperation = "Backup završen",
                     DetailedStatus = successMessage,
@@ -619,7 +503,7 @@ namespace BackupApp
             {
                 OnLog?.Invoke($"Greška: {ex.Message}", true);
                 // Pokušaj unmount i u slučaju greške
-                try 
+                try
                 {
                     UnmountDiskD();
                 }
@@ -675,7 +559,7 @@ namespace BackupApp
             sb.AppendLine($"<h2 style='margin:0;'>{report.BackupType} Backup Report</h2>");
             sb.AppendLine($"<div style='opacity:0.8;font-size:14px;margin-top:5px;'>{report.StartTime:dd.MM.yyyy HH:mm:ss}</div>");
             sb.AppendLine("</div>");
-            
+
             sb.AppendLine("<div class='content'>");
             sb.AppendLine("<div class='metric-grid'>");
             // Status Box
@@ -728,26 +612,32 @@ namespace BackupApp
                 }
                 sb.AppendLine("</div></div>");
             }
-            
+
             sb.AppendLine("<div class='footer'>");
             sb.AppendLine("Generated by Backup App");
             sb.AppendLine("</div>");
-            
+
             sb.AppendLine("</div></body></html>");
-            
+
             return sb.ToString();
         }
 
         private async Task BackupFileAsync(FileInfo sourceFile, BackupType backupType, BackupReport report)
         {
             var destinationPath = GetBackupDestinationPath(sourceFile, backupType);
+
+            if (!destinationPath.StartsWith("D:", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException($"Nedozvoljena putanja za backup: {destinationPath}. Backup je dozvoljen samo na D: drajv.");
+            }
+
             Directory.CreateDirectory(Path.GetDirectoryName(destinationPath));
             const int bufferSize = 4 * 1024 * 1024; // 4MB buffer
             var buffer = new byte[bufferSize];
             var speedTimer = new System.Diagnostics.Stopwatch();
             using var sourceStream = sourceFile.OpenRead();
             using var destStream = File.Create(destinationPath);
-            
+
             report.CurrentFile = sourceFile.Name;
             int bytesRead;
             long totalBytesRead = 0;
@@ -758,13 +648,13 @@ namespace BackupApp
                 await destStream.WriteAsync(buffer, 0, bytesRead);
                 totalBytesRead += bytesRead;
                 report.ProcessedBytes += bytesRead;
-            
+
                 // Računamo trenutnu brzinu na svaki sekund
                 if (speedTimer.ElapsedMilliseconds >= 1000)
                 {
                     report.CurrentSpeedMBps = totalBytesRead / (1024.0 * 1024.0) / speedTimer.Elapsed.TotalSeconds;
                     report.PeakSpeedMBps = Math.Max(report.PeakSpeedMBps, report.CurrentSpeedMBps);
-                    OnProgress?.Invoke(new ProgressInfo 
+                    OnProgress?.Invoke(new ProgressInfo
                     {
                         CurrentOperation = $"Kopiranje ({FormatFileSize(report.ProcessedBytes)}/{FormatFileSize(report.TotalSize)})",
                         CurrentFile = report.CurrentFile,
@@ -869,7 +759,7 @@ namespace BackupApp
             const int bufferSize = 1024 * 1024; // 1MB buffer
             using var sourceStream = new FileStream(source, FileMode.Open, FileAccess.Read);
             using var destStream = new FileStream(destination, FileMode.Create, FileAccess.Write);
-            
+
             var buffer = new byte[bufferSize];
             int bytesRead;
             while ((bytesRead = await sourceStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
@@ -926,7 +816,7 @@ namespace BackupApp
         {
             string infoPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BackupApp");
             Directory.CreateDirectory(infoPath);
-            
+
             string infoFile = Path.Combine(infoPath, "LastBackupInfo.txt");
             File.WriteAllText(infoFile, $"{lastBackupPath}|{lastBackupTime:yyyy-MM-dd HH:mm:ss}");
         }
@@ -1032,7 +922,7 @@ namespace BackupApp
                 string settingsPath = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                     "BackupApp");
-                
+
                 Directory.CreateDirectory(settingsPath);
                 string filePath = Path.Combine(settingsPath, "email_settings.json");
                 string json = JsonSerializer.Serialize(EmailSettings);
@@ -1074,21 +964,18 @@ namespace BackupApp
                     "BackupApp");
                 Directory.CreateDirectory(appFolder);
                 string filePath = Path.Combine(appFolder, "backup_schedule.json");
-                
-                var options = new JsonSerializerOptions 
-                { 
+
+                var options = new JsonSerializerOptions
+                {
                     WriteIndented = true,
                     Converters = { new JsonTimeSpanConverter() }
                 };
-                
+
                 var json = JsonSerializer.Serialize(CurrentSchedule, options);
                 File.WriteAllText(filePath, json);
-                
+
                 LogMessage($"Raspored je sačuvan u: {filePath}", false);
                 LogMessage($"Sledeći backup zakazan za: {GetNextBackupTime():dd.MM.yyyy HH:mm}", false);
-                
-                // Reset timera da odmah krene sa novim rasporedom
-                _lastRunTime = DateTime.MinValue;
             }
             catch (Exception ex)
             {
@@ -1111,7 +998,7 @@ namespace BackupApp
                     LogMessage($"Učitavam raspored iz: {filePath}", false);
                     string jsonContent = File.ReadAllText(filePath);
                     CurrentSchedule = JsonSerializer.Deserialize<BackupSchedule>(jsonContent);
-                    
+
                     if (CurrentSchedule != null)
                     {
                         LogMessage($"Učitan raspored za {CurrentSchedule.Time:HH:mm}", false);
@@ -1138,14 +1025,14 @@ namespace BackupApp
                 var appDataPath = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                     "BackupApp");
-                
+
                 if (!Directory.Exists(appDataPath))
                 {
                     Directory.CreateDirectory(appDataPath);
                 }
 
                 var pathsFile = Path.Combine(appDataPath, PATHS_FILE);
-                
+
                 // Filtriramo i čuvamo samo validne putanje
                 var validPaths = SavedPaths
                     .Where(p => !string.IsNullOrEmpty(p) && Directory.Exists(p))
@@ -1153,16 +1040,16 @@ namespace BackupApp
                     .Distinct()
                     .ToList();
 
-                var json = JsonSerializer.Serialize(validPaths, new JsonSerializerOptions 
-                { 
-                    WriteIndented = true 
+                var json = JsonSerializer.Serialize(validPaths, new JsonSerializerOptions
+                {
+                    WriteIndented = true
                 });
-                
+
                 File.WriteAllText(pathsFile, json);
-                
+
                 // Ažuriramo listu u memoriji
                 SavedPaths = validPaths;
-                
+
                 LogMessage($"Sačuvano {validPaths.Count} foldera za backup", false);
                 LogMessage($"Putanje su sačuvane u: {pathsFile}", false);
                 LogMessage($"Trenutne putanje: {string.Join(", ", validPaths)}", false);
@@ -1189,7 +1076,7 @@ namespace BackupApp
                 }
 
                 path = Path.GetFullPath(path);
-                
+
                 if (!SavedPaths.Contains(path))
                 {
                     SavedPaths.Add(path);
@@ -1251,7 +1138,7 @@ namespace BackupApp
                 var appDataPath = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                     "BackupApp");
-                
+
                 var pathsFile = Path.Combine(appDataPath, PATHS_FILE);
 
                 LogMessage($"Pokušavam učitati putanje iz: {pathsFile}", false);
@@ -1309,13 +1196,13 @@ namespace BackupApp
                 LoadSchedule();
                 LogMessage("Inicijalizacija backup servisa...", false);
                 LogMessage($"Učitano {SavedPaths.Count} foldera za backup", false);
-                
+
                 if (CurrentSchedule?.IsEnabled == true)
                 {
                     var nextBackup = GetNextBackupTime();
                     LogMessage($"Backup je zakazan za {nextBackup:dd.MM.yyyy HH:mm}", false);
                     LogMessage($"Tip backup-a: {CurrentSchedule.BackupType}", false);
-                       
+
                     // Proveri da li je task registrovan
                     if (_scheduleService.IsTaskScheduled())
                         LogMessage("Windows Task je uspešno registrovan", false);
@@ -1326,8 +1213,6 @@ namespace BackupApp
                 {
                     LogMessage("Backup nije zakazan", false);
                 }
-                _scheduleTimer.Start();
-                LogMessage("Servis je pokrenut i prati raspored", false);
             }
             catch (Exception ex)
             {
@@ -1335,31 +1220,12 @@ namespace BackupApp
             }
         }
 
-        public void InitializeEmail()
-        {
-            EmailSettings = new EmailSettings
-            {
-                SmtpServer = "smtp.aol.com",
-                SmtpPort = 587,
-                Username = "dzekn@aol.com",
-                Password = "ibewcjgpnjxketvi",
-                FromEmail = "dzekn@aol.com",
-                ToEmail = "dzekn@aol.com",
-                EnableSsl = true
-            };
-
-            _emailService = new EmailService(EmailSettings);
-            _emailService.OnLog += (message, isError) => OnLog?.Invoke(message, isError);
-            
-            SaveEmailSettings();
-        }
-
         public async Task<bool> TestScheduleAsync()
         {
             try
             {
                 OnLog?.Invoke("Testiram scheduled backup...", false);
-                
+
                 // Provera da li je scheduling omogućen
                 if (CurrentSchedule == null || !CurrentSchedule.IsEnabled)
                 {
@@ -1461,10 +1327,10 @@ namespace BackupApp
         {
             if (CurrentSchedule == null)
                 return "Backup nije konfigurisan";
-                
+
             if (!CurrentSchedule.IsEnabled)
                 return "Backup je onemogućen";
-                
+
             var nextRun = GetNextBackupTime();
             return $"Sledeći backup: {nextRun:dd.MM.yyyy HH:mm}";
         }
